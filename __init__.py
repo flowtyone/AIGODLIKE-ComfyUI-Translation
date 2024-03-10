@@ -1,26 +1,26 @@
 import os
 import json
-import platform
-import sys
-import numpy as np
-import builtins
-import torch
-import shutil
-import hashlib
-import atexit
-import server
-import gc
-import execution
-import folder_paths
-from functools import lru_cache
-from aiohttp import web
+# import platform
+# import sys
+# import numpy as np
+# import builtins
+# import torch
+# import shutil
+# import hashlib
+# import atexit
+# import server
+# import gc
+# import execution
+# import folder_paths
+# from functools import lru_cache
+# from aiohttp import web
 from pathlib import Path
-from PIL import Image
-from PIL.PngImagePlugin import PngInfo
+# from PIL import Image
+# from PIL.PngImagePlugin import PngInfo
 
 VERSION = "0.0.1"
 ADDON_NAME = "AIGODLIKE-COMFYUI-TRANSLATION"
-COMFY_PATH = Path(folder_paths.__file__).parent
+# COMFY_PATH = Path(folder_paths.__file__).parent
 CUR_PATH = Path(__file__).parent
 
 
@@ -63,7 +63,7 @@ def get_menu_translation(locale):
     return try_get_json(path)
 
 
-@lru_cache
+#@lru_cache
 def compile_translation(locale):
     # translations_path = CUR_PATH.joinpath(f"translations_{locale}.json")
     # if translations_path.exists():
@@ -83,97 +83,111 @@ def compile_translation(locale):
     # translations_path.write_text(json_data, encoding="utf-8")
     return json_data
 
+if __name__ == "__main__":
+    import re
+    import shutil
+    locale_reg = re.compile(r"^[a-z]{2}-[A-Z]{2}$")
 
-@lru_cache
-def compress_json(data, method="gzip"):
-    if method == "gzip":
-        import gzip
-        return gzip.compress(data.encode("utf-8"))
-    else:
-        return data
+    for directory in os.listdir(CUR_PATH) + ["en-US"]:
+        if locale_reg.match(directory):
+            translation = compile_translation(directory)
 
+            with open(os.path.join(CUR_PATH, "web/translations", directory+".json"), "w") as f:
+                f.write(translation)
 
-@server.PromptServer.instance.routes.post("/agl/get_translation")
-async def get_translation(request: web.Request):
-    post = await request.post()
-    locale = post.get("locale", "en_US")
-    accept_encoding = request.headers.get("Accept-Encoding", "")
-    json_data = "{}"
-    headers = {}
-    try:
-        json_data = compile_translation(locale)
-        if "gzip" in accept_encoding:
-            json_data = compress_json(json_data, method="gzip")
-            headers["Content-Encoding"] = "gzip"
-    except Exception as e:
-        sys.stderr.write(f"[agl/get_translation error]: {e}\n")
-        sys.stderr.flush()
-    return web.Response(status=200, body=json_data, content_type="application/json", headers=headers)
+        if directory.endswith(".js"):
+            shutil.copyfile(os.path.join(CUR_PATH, directory), os.path.join(CUR_PATH,"web", directory))
 
-
-def rmtree(path: Path):
-    # unlink symbolic link
-    if not path.exists():
-        return
-    if Path(path.resolve()).as_posix() != path.as_posix():
-        path.unlink()
-        return
-    if path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        # 移除 .git
-        if path.name == ".git":
-            if platform.system() == "darwin":
-                from subprocess import call
-                call(['rm', '-rf', path.as_posix()])
-            elif platform.system() == "Windows":
-                os.system(f'rd/s/q "{path.as_posix()}"')
-            return
-        for child in path.iterdir():
-            rmtree(child)
-        try:
-            path.rmdir()  # nas 的共享盘可能会有残留
-        except BaseException:
-            ...
-
-
-def register():
-    import nodes
-    aigodlike_ext_path = COMFY_PATH.joinpath("web", "extensions", ADDON_NAME)
-    if hasattr(nodes, "EXTENSION_WEB_DIRS"):
-        rmtree(aigodlike_ext_path)
-        return
-    # 新版已经不需要复制文件了
-    try:
-        if os.name == "nt":
-            try:
-                import _winapi
-                _winapi.CreateJunction(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix())
-            except WindowsError as e:
-                shutil.copytree(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix(), ignore=shutil.ignore_patterns(".git"))
-        else:
-            # 复制时过滤 .git
-            shutil.copytree(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix(), ignore=shutil.ignore_patterns(".git"))
-    except Exception as e:
-        sys.stderr.write(f"[agl/register error]: {e}\n")
-        sys.stderr.flush()
-
-
-def unregister():
-    # 移除缓存json
-    # for data in CUR_PATH.glob("*.json"):
-    #     if not data.name.startswith("translations_"):
-    #         continue
-    #     data.unlink()
-
-    aigodlike_ext_path = COMFY_PATH.joinpath("web", "extensions", ADDON_NAME)
-    try:
-        rmtree(aigodlike_ext_path)
-    except BaseException:
-        ...
-
-
-register()
-atexit.register(unregister)
+# @lru_cache
+# def compress_json(data, method="gzip"):
+#     if method == "gzip":
+#         import gzip
+#         return gzip.compress(data.encode("utf-8"))
+#     else:
+#         return data
+#
+#
+# @server.PromptServer.instance.routes.post("/agl/get_translation")
+# async def get_translation(request: web.Request):
+#     post = await request.post()
+#     locale = post.get("locale", "en_US")
+#     accept_encoding = request.headers.get("Accept-Encoding", "")
+#     json_data = "{}"
+#     headers = {}
+#     try:
+#         json_data = compile_translation(locale)
+#         if "gzip" in accept_encoding:
+#             json_data = compress_json(json_data, method="gzip")
+#             headers["Content-Encoding"] = "gzip"
+#     except Exception as e:
+#         sys.stderr.write(f"[agl/get_translation error]: {e}\n")
+#         sys.stderr.flush()
+#     return web.Response(status=200, body=json_data, content_type="application/json", headers=headers)
+#
+#
+# def rmtree(path: Path):
+#     # unlink symbolic link
+#     if not path.exists():
+#         return
+#     if Path(path.resolve()).as_posix() != path.as_posix():
+#         path.unlink()
+#         return
+#     if path.is_file():
+#         path.unlink()
+#     elif path.is_dir():
+#         # 移除 .git
+#         if path.name == ".git":
+#             if platform.system() == "darwin":
+#                 from subprocess import call
+#                 call(['rm', '-rf', path.as_posix()])
+#             elif platform.system() == "Windows":
+#                 os.system(f'rd/s/q "{path.as_posix()}"')
+#             return
+#         for child in path.iterdir():
+#             rmtree(child)
+#         try:
+#             path.rmdir()  # nas 的共享盘可能会有残留
+#         except BaseException:
+#             ...
+#
+#
+# def register():
+#     import nodes
+#     aigodlike_ext_path = COMFY_PATH.joinpath("web", "extensions", ADDON_NAME)
+#     if hasattr(nodes, "EXTENSION_WEB_DIRS"):
+#         rmtree(aigodlike_ext_path)
+#         return
+#     # 新版已经不需要复制文件了
+#     try:
+#         if os.name == "nt":
+#             try:
+#                 import _winapi
+#                 _winapi.CreateJunction(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix())
+#             except WindowsError as e:
+#                 shutil.copytree(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix(), ignore=shutil.ignore_patterns(".git"))
+#         else:
+#             # 复制时过滤 .git
+#             shutil.copytree(CUR_PATH.as_posix(), aigodlike_ext_path.as_posix(), ignore=shutil.ignore_patterns(".git"))
+#     except Exception as e:
+#         sys.stderr.write(f"[agl/register error]: {e}\n")
+#         sys.stderr.flush()
+#
+#
+# def unregister():
+#     # 移除缓存json
+#     # for data in CUR_PATH.glob("*.json"):
+#     #     if not data.name.startswith("translations_"):
+#     #         continue
+#     #     data.unlink()
+#
+#     aigodlike_ext_path = COMFY_PATH.joinpath("web", "extensions", ADDON_NAME)
+#     try:
+#         rmtree(aigodlike_ext_path)
+#     except BaseException:
+#         ...
+#
+#
+# register()
+# atexit.register(unregister)
 NODE_CLASS_MAPPINGS = {}
-WEB_DIRECTORY = "./"
+WEB_DIRECTORY = "./web"
